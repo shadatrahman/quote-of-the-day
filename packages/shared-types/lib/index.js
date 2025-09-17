@@ -21,4 +21,6 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 // Export all user-related types
 __exportStar(require("./models/user"), exports);
+// Export all subscription-related types
+__exportStar(require("./models/subscription"), exports);
 //# sourceMappingURL=index.js.map

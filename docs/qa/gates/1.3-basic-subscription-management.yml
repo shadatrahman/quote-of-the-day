@@ -1,0 +1,68 @@
+# Quality Gate Decision for Story 1.3: Basic Subscription Management
+schema: 1
+story: "1.3"
+story_title: "Basic Subscription Management"
+gate: "CONCERNS"
+status_reason: "Critical E2E test failures prevent production deployment despite solid implementation"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-01-27T21:47:49Z"
+
+# Issues identified
+top_issues:
+  - id: "E2E-001"
+    severity: high
+    finding: "5/6 E2E tests failing due to Pydantic validation errors with Mock objects"
+    suggested_action: "Replace Mock objects with proper data structures in E2E tests"
+  - id: "E2E-002"
+    severity: high
+    finding: "E2E test mocking patterns don't conform to Pydantic schema requirements"
+    suggested_action: "Implement proper test data factories instead of Mock objects"
+  - id: "E2E-003"
+    severity: medium
+    finding: "Inconsistent error response formats across E2E test scenarios"
+    suggested_action: "Standardize error response handling in E2E tests"
+
+# Risk assessment
+risk_summary:
+  totals: { critical: 0, high: 2, medium: 1, low: 0 }
+  recommendations:
+    must_fix: 
+      - "Fix E2E test mocking to use proper data structures"
+      - "Implement Pydantic schema validation in E2E tests"
+    monitor:
+      - "E2E test reliability and maintainability"
+
+# Evidence from review
+evidence:
+  tests_reviewed: 47
+  risks_identified: 3
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6]  # All ACs implemented
+    ac_gaps: []  # No gaps in implementation
+
+# NFR validation
+nfr_validation:
+  security: { status: PASS, notes: "Proper Stripe integration and security measures" }
+  performance: { status: PASS, notes: "Good async patterns and rate limiting" }
+  reliability: { status: CONCERNS, notes: "E2E test failures indicate potential deployment issues" }
+  maintainability: { status: PASS, notes: "Clean architecture and good separation of concerns" }
+
+# Quality score calculation: 100 - (20*high) - (10*medium) = 100 - 40 - 10 = 50
+quality_score: 50
+expires: "2025-02-10T00:00:00Z"
+
+# Recommendations
+recommendations:
+  immediate:  # Must fix before production
+    - action: "Fix E2E test mocking to use proper data structures instead of Mock objects"
+      refs: ["tests/e2e/test_subscription_flow.py"]
+    - action: "Implement proper Pydantic schema validation in E2E tests"
+      refs: ["tests/e2e/test_subscription_flow.py"]
+  future:  # Can be addressed later
+    - action: "Add audit logging for subscription changes"
+      refs: ["apps/api/src/services/subscription_service.py"]
+    - action: "Consider adding integration test for webhook scenarios"
+      refs: ["apps/api/tests/integration/"]
+
+# Waiver status
+waiver: { active: false }

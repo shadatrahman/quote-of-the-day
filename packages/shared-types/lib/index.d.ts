@@ -4,6 +4,7 @@
  * both the backend (Python) and frontend (Flutter/TypeScript) applications.
  */
 export * from './models/user';
+export * from './models/subscription';
 export interface ApiResponse<T = any> {
     data?: T;
     error?: {

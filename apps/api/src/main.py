@@ -6,6 +6,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import uvicorn
 
 from src.core.config import settings
@@ -16,12 +19,16 @@ from src.core.logging import setup_logging, RequestLoggingMiddleware, get_logger
 from src.core.monitoring import setup_sentry, metrics
 from src.core.cloudwatch import setup_cloudwatch_logging
 from src.api.v1.router import api_router
+from src.core.stripe_config import router as stripe_router
 
 # Setup logging and monitoring before creating the app
 setup_logging()
 setup_cloudwatch_logging()
 setup_sentry()
 logger = get_logger("quote.api.main")
+
+# Rate limiter configuration
+limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
@@ -52,6 +59,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Configure rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -61,11 +72,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Trusted host middleware for security
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=settings.ALLOWED_HOSTS,
-)
+# Trusted host middleware for security (disabled in test environment)
+if settings.ENVIRONMENT != "test":
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=settings.ALLOWED_HOSTS,
+    )
 
 # Add request logging middleware
 app.add_middleware(RequestLoggingMiddleware)
@@ -75,6 +87,7 @@ setup_exception_handlers(app)
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(stripe_router)
 
 # Application startup and shutdown events are now handled by lifespan
 

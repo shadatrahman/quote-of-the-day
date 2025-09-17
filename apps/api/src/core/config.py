@@ -68,8 +68,14 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: Optional[str] = Field(
         default=None, description="Stripe secret key"
     )
+    STRIPE_PUBLISHABLE_KEY: Optional[str] = Field(
+        default=None, description="Stripe publishable key"
+    )
     STRIPE_WEBHOOK_SECRET: Optional[str] = Field(
         default=None, description="Stripe webhook secret"
+    )
+    STRIPE_PRICE_ID_PREMIUM: Optional[str] = Field(
+        default=None, description="Stripe price ID for premium subscription"
     )
 
     # Monitoring

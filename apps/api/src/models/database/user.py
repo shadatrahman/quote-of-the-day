@@ -67,6 +67,11 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # Relationships
+    subscription: Mapped[Optional["Subscription"]] = relationship(
+        "Subscription", back_populates="user", uselist=False
+    )
+
     def __repr__(self) -> str:
         """String representation of the User model."""
         return f"<User(id={self.id}, email={self.email}, is_active={self.is_active})>"
