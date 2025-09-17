@@ -1,0 +1,54 @@
+name: quote_of_the_day
+repository: https://github.com/yourorg/quote-of-the-day
+
+packages:
+  - apps/mobile
+  - packages/**
+
+command:
+  version:
+    # Generate commit links in package changelogs.
+    linkToCommits: true
+    # Only allow versioning to happen on main branch.
+    branch: main
+    # Additionally build a changelog at the root of the workspace.
+    workspaceChangelog: true
+
+  bootstrap:
+    # It seems so that running "pub get" in parallel has some issues (like
+    # https://github.com/dart-lang/pub/issues/3404). Disabling this feature
+    # makes the bootstrap process more reliable.
+    runPubGetInParallel: false
+
+scripts:
+  analyze:
+    run: flutter analyze .
+    exec:
+      concurrency: 1
+
+  test:
+    run: flutter test --coverage
+    exec:
+      concurrency: 1
+
+  format:
+    run: dart format .
+    exec:
+      concurrency: 1
+
+  build:mobile:
+    run: flutter build apk --release
+    exec:
+      scope: quote_of_the_day_mobile
+      concurrency: 1
+
+  build:mobile:ios:
+    run: flutter build ios --release
+    exec:
+      scope: quote_of_the_day_mobile
+      concurrency: 1
+
+  clean:
+    run: flutter clean
+    exec:
+      concurrency: 1

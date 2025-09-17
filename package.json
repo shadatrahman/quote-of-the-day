@@ -1,0 +1,69 @@
+{
+  "name": "quote-of-the-day",
+  "version": "1.0.0",
+  "description": "Personalized Quote of the Day mobile application with subscription tiers",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "infrastructure/aws"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:services\" \"npm run dev:api\" \"npm run dev:mobile\"",
+    "dev:services": "docker-compose up postgres redis -d",
+    "dev:api": "cd apps/api && python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:mobile": "cd apps/mobile && flutter run",
+    "dev:full-stack": "docker-compose --profile full-stack up -d",
+    "dev:tools": "docker-compose --profile tools up -d",
+    "stop": "docker-compose down",
+    "stop:all": "docker-compose --profile tools --profile full-stack down",
+    "logs": "docker-compose logs -f",
+    "logs:api": "docker-compose logs -f api",
+    "logs:db": "docker-compose logs -f postgres",
+    "test": "npm run test:api && npm run test:mobile",
+    "test:api": "cd apps/api && python -m pytest tests/ -v --cov=src",
+    "test:mobile": "cd apps/mobile && flutter test --coverage",
+    "test:integration": "docker-compose --profile test up -d && npm run test:api && docker-compose --profile test down",
+    "build": "npm run build:api && npm run build:mobile",
+    "build:api": "cd apps/api && docker build -t quote-api .",
+    "build:mobile": "cd apps/mobile && flutter build apk --release && flutter build ios --release",
+    "db:migrate": "cd apps/api && alembic upgrade head",
+    "db:seed": "cd apps/api && python scripts/seed_database.py",
+    "db:reset": "cd apps/api && alembic downgrade base && alembic upgrade head && python scripts/seed_database.py",
+    "db:shell": "docker-compose exec postgres psql -U quote_user -d quote_of_the_day_dev",
+    "redis:cli": "docker-compose exec redis redis-cli",
+    "lint": "npm run lint:api && npm run lint:mobile",
+    "lint:api": "cd apps/api && ruff check . && mypy src/",
+    "lint:mobile": "cd apps/mobile && dart analyze lib/",
+    "format": "npm run format:api && npm run format:mobile",
+    "format:api": "cd apps/api && ruff format .",
+    "format:mobile": "cd apps/mobile && dart format lib/",
+    "clean": "npm run clean:api && npm run clean:mobile",
+    "clean:api": "cd apps/api && find . -type d -name __pycache__ -exec rm -rf {} + && find . -name '*.pyc' -delete",
+    "clean:mobile": "cd apps/mobile && flutter clean",
+    "deploy:staging": "cd infrastructure/aws && npm run deploy:staging",
+    "deploy:prod": "cd infrastructure/aws && npm run deploy:prod",
+    "install:all": "npm install && cd apps/api && pip install -r requirements.txt && cd ../mobile && flutter pub get && cd ../../packages/shared-types && npm install && cd ../ui-components && flutter pub get && cd ../../infrastructure/aws && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourorg/quote-of-the-day.git"
+  },
+  "keywords": [
+    "flutter",
+    "fastapi",
+    "quotes",
+    "mobile-app",
+    "subscription",
+    "aws"
+  ],
+  "author": "Your Organization",
+  "license": "MIT"
+}

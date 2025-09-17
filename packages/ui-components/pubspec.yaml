@@ -1,0 +1,23 @@
+name: quote_ui_components
+description: "Shared Flutter UI components for Quote of the Day"
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.8.1
+  flutter: ">=3.32.8"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI & Theming
+  google_fonts: ^6.2.1
+  flutter_svg: ^2.0.10+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:

@@ -1,0 +1,358 @@
+name: Security Scanning
+
+on:
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.13'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # Dependency vulnerability scanning
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # Node.js dependency scanning
+      - name: Run npm audit
+        run: |
+          npm audit --audit-level=moderate --production
+        continue-on-error: true
+
+      - name: Install Node.js dependencies for scanning
+        run: |
+          npm ci
+          cd packages/shared-types && npm install
+          cd ../.. && cd infrastructure/aws && npm install
+
+      - name: Run Node.js security audit with audit-ci
+        run: |
+          npx audit-ci --config .auditci.json
+        continue-on-error: true
+
+      # Python dependency scanning
+      - name: Install Python dependencies
+        run: |
+          cd apps/api
+          python -m pip install --upgrade pip
+          pip install safety bandit semgrep
+
+      - name: Run Safety check for Python dependencies
+        run: |
+          cd apps/api
+          safety check --json --output safety-report.json || true
+          safety check --short-report
+
+      - name: Upload Safety report
+        uses: actions/upload-artifact@v3
+        with:
+          name: safety-report
+          path: apps/api/safety-report.json
+
+  # Code security analysis
+  code-security-scan:
+    name: Code Security Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Python security scanning with Bandit
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install security tools
+        run: |
+          pip install bandit[toml] semgrep
+
+      - name: Run Bandit security scan
+        run: |
+          cd apps/api
+          bandit -r src/ -f json -o bandit-report.json || true
+          bandit -r src/ -f txt
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v3
+        with:
+          name: bandit-report
+          path: apps/api/bandit-report.json
+
+      # Semgrep security analysis
+      - name: Run Semgrep security scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/docker
+          generateSarif: "1"
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      # CodeQL Analysis
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: python, javascript
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:${{matrix.language}}"
+
+  # Container security scanning
+  container-security-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build API Docker image
+        run: |
+          docker build -t quote-api:security-scan -f apps/api/Dockerfile .
+
+      - name: Run Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'quote-api:security-scan'
+          format: 'sarif'
+          output: 'trivy-container-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-container-results.sarif'
+
+      - name: Run container security scan with detailed output
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'quote-api:security-scan'
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+  # Filesystem security scanning
+  filesystem-security-scan:
+    name: Filesystem Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+
+      - name: Upload Trivy filesystem scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+
+      - name: Run filesystem scan with detailed output
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+  # Secret scanning
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run GitLeaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run TruffleHog secret scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  # Docker Dockerfile security analysis
+  dockerfile-scan:
+    name: Dockerfile Security Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Hadolint on API Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: apps/api/Dockerfile
+          format: sarif
+          output-file: hadolint-results.sarif
+          no-fail: true
+
+      - name: Upload Hadolint scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: hadolint-results.sarif
+
+  # License compliance check
+  license-scan:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install license scanners
+        run: |
+          npm install -g license-checker
+          pip install pip-licenses
+
+      - name: Check Node.js licenses
+        run: |
+          npm ci
+          license-checker --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;Unlicense' --excludePrivatePackages
+
+      - name: Check Python licenses
+        run: |
+          cd apps/api
+          pip install -r requirements.txt
+          pip-licenses --format=json --output-file=licenses.json
+          pip-licenses --allow-only='MIT License;Apache Software License;BSD License;ISC License'
+
+      - name: Upload license reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: license-reports
+          path: |
+            apps/api/licenses.json
+
+  # Security report compilation
+  security-report:
+    name: Compile Security Report
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, code-security-scan, container-security-scan, filesystem-security-scan, secret-scan, dockerfile-scan, license-scan]
+    if: always()
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Compile security report
+        run: |
+          cat << 'EOF' > security-report.md
+          # Security Scan Report
+
+          **Date:** $(date -u)
+          **Repository:** ${{ github.repository }}
+          **Branch:** ${{ github.ref_name }}
+          **Commit:** ${{ github.sha }}
+
+          ## Scan Results Summary
+
+          | Scan Type | Status |
+          |-----------|--------|
+          | Dependency Scan | ${{ needs.dependency-scan.result }} |
+          | Code Security | ${{ needs.code-security-scan.result }} |
+          | Container Security | ${{ needs.container-security-scan.result }} |
+          | Filesystem Security | ${{ needs.filesystem-security-scan.result }} |
+          | Secret Scanning | ${{ needs.secret-scan.result }} |
+          | Dockerfile Analysis | ${{ needs.dockerfile-scan.result }} |
+          | License Compliance | ${{ needs.license-scan.result }} |
+
+          ## Recommendations
+
+          - Review any identified vulnerabilities in the GitHub Security tab
+          - Update dependencies with known vulnerabilities
+          - Address any secrets or sensitive data found in code
+          - Ensure all licenses are compliant with organizational policies
+
+          ## Next Steps
+
+          1. Review detailed findings in GitHub Security advisories
+          2. Create issues for high-priority security findings
+          3. Update security policies if needed
+          4. Schedule regular security reviews
+          EOF
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-report
+          path: security-report.md
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('security-report.md')) {
+              const report = fs.readFileSync('security-report.md', 'utf8');
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🔒 Security Scan Results\n\n${report}`
+              });
+            }

@@ -1,0 +1,34 @@
+{
+  "name": "@quote-of-the-day/shared-types",
+  "version": "1.0.0",
+  "description": "Shared type definitions for Quote of the Day application",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "lib/",
+    "index.js",
+    "index.d.ts"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf lib/ index.js index.d.ts",
+    "lint": "eslint src/ --ext .ts",
+    "format": "prettier --write src/"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "eslint": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^7.8.0",
+    "@typescript-eslint/parser": "^7.8.0",
+    "prettier": "^3.2.5"
+  },
+  "keywords": [
+    "types",
+    "typescript",
+    "shared",
+    "quote-of-the-day"
+  ],
+  "author": "Your Organization",
+  "license": "MIT"
+}
